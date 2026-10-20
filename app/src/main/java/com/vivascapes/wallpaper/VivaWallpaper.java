@@ -26,6 +26,7 @@ public final class VivaWallpaper extends WallpaperService {
     private int width=0,height=0;
     private Bitmap picture=null;
     private String loadedKey="";
+    private int loadedPhase=-1;
     private long lastMillis=0;
     Scene(){prefs.registerOnSharedPreferenceChangeListener(this);}
     @Override public void onCreate(SurfaceHolder holder){
@@ -39,7 +40,7 @@ public final class VivaWallpaper extends WallpaperService {
       if(show)refresh();else release();
     }
     @Override public void onSharedPreferenceChanged(SharedPreferences s,String k){
-      if(k!=null){loadedKey="";refresh();}
+      if(k!=null){release();refresh();}
     }
     @Override public void onSurfaceDestroyed(SurfaceHolder holder){
       handler.removeCallbacks(update);super.onSurfaceDestroyed(holder);
@@ -48,7 +49,7 @@ public final class VivaWallpaper extends WallpaperService {
       closed=true;visible=false;handler.removeCallbacks(update);
       prefs.unregisterOnSharedPreferenceChangeListener(this);release();super.onDestroy();
     }
-    private void release(){if(picture!=null){picture.recycle();picture=null;}loadedKey="";}
+    private void release(){if(picture!=null){picture.recycle();picture=null;}loadedKey="";loadedPhase=-1;}
     private void refresh(){handler.removeCallbacks(update);if(visible&&!closed&&width>0&&height>0)handler.post(update);}
     private int phase(){
       int mode=prefs.getInt(PackStore.MODE,0);if(mode>0)return mode-1;
@@ -56,9 +57,11 @@ public final class VivaWallpaper extends WallpaperService {
       return hour>=7&&hour<17?0:hour>=17&&hour<20?1:2;
     }
     private void loadSceneIfNeeded(){
+      int phase=phase();
+      // Keep the decoded bitmap cached: no ZIP scans or bitmap metadata decoding per frame.
+      if(picture!=null && loadedPhase==phase)return;
       PackStore.Pack pack=PackStore.selected(VivaWallpaper.this);
       if(pack==null){release();return;}
-      int phase=phase();
       String key=pack.id+":"+phase;
       if(picture!=null&&key.equals(loadedKey))return;
       File target=phase==0?pack.day:phase==1?pack.dusk:pack.night;
@@ -72,7 +75,7 @@ public final class VivaWallpaper extends WallpaperService {
       opts.inSampleSize=sample;opts.inScaled=false;opts.inPreferredConfig=Bitmap.Config.RGB_565;
       Bitmap next=null;
       try{next=BitmapFactory.decodeFile(target.getAbsolutePath(),opts);}catch(OutOfMemoryError e){android.util.Log.w("VivaScapes","Out of memory while decoding",e);}
-      if(next!=null){release();picture=next;loadedKey=key;}
+      if(next!=null){release();picture=next;loadedKey=key;loadedPhase=phase;}
     }
     private void drawFrame(){
       if(!visible||closed||width<=0||height<=0)return;
