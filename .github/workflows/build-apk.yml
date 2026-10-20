@@ -19,6 +19,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      # Reuse the same local debug signature for future demo builds when cached.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: vivascapes-demo-signing-v1
       - name: Build Android APK
         run: gradle --no-daemon assembleDebug
       - uses: actions/upload-artifact@v4
